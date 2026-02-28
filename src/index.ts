@@ -1,11 +1,41 @@
 import Fastify from 'fastify'
 import { z } from 'zod'
-import { serializerCompiler, validatorCompiler, ZodTypeProvider } from 'fastify-type-provider-zod';
+import {
+  createJsonSchemaTransform,
+  serializerCompiler,
+  validatorCompiler,
+  ZodTypeProvider,
+} from 'fastify-type-provider-zod';
+import fastifySwagger from '@fastify/swagger';
+import fastifySwaggerUI from '@fastify/swagger-ui';
+
 
 const app = Fastify({ logger: true })
 
 app.setValidatorCompiler(validatorCompiler);
 app.setSerializerCompiler(serializerCompiler);
+
+
+await app.register(fastifySwagger, {
+    openapi: {
+      info: {
+        title: 'Bootcamp Treinos API',
+        description: 'API para o Bootcamp Treinos',
+        version: '1.0.0',
+      },
+      servers: [
+        {
+            description: 'Localhost',
+            url: 'http://localhost:3000',
+        },
+    ],
+  },
+  transform: createJsonSchemaTransform({})
+});
+
+await app.register(fastifySwaggerUI, {
+    routePrefix: '/docs',
+  });
 
 app.withTypeProvider<ZodTypeProvider>().route({
   method: 'GET',
