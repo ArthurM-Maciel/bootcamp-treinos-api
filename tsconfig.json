@@ -1,14 +1,19 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  
+
   "compilerOptions": {
-  
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "target": "ES2024", 
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
     "skipLibCheck": true,
     "strict": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true,
+    "sourceMap": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
 }
