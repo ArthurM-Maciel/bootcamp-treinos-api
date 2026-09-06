@@ -1,18 +1,23 @@
 {
-  "name": "y",
+  "name": "bootcamp-treinos-api",
   "version": "1.0.0",
-  "description": "",
+  "description": "API REST do Bootcamp Treinos (FSC) — Fastify, Prisma e Better Auth",
   "license": "ISC",
   "author": "",
   "type": "module",
   "scripts": {
     "dev": "tsx --watch src/index.ts",
+    "build": "tsc",
+    "lint": "eslint .",
+    "format": "prettier --write .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {
     "node": "24.x"
   },
+  "packageManager": "pnpm@10.30.0",
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^24.10.15",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
@@ -24,13 +29,23 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.56.1"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@prisma/engines",
+      "esbuild",
+      "prisma"
+    ]
+  },
   "dependencies": {
+    "@ai-sdk/openai": "^3.0.33",
     "@fastify/cors": "^11.2.0",
     "@fastify/swagger": "^9.7.0",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.0",
     "@scalar/fastify-api-reference": "^1.44.20",
+    "ai": "^6.0.100",
     "better-auth": "^1.4.18",
+    "dayjs": "^1.11.19",
     "dotenv": "^17.3.1",
     "fastify": "^5.7.4",
     "fastify-type-provider-zod": "^6.1.0",
