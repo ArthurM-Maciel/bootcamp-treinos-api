@@ -1,120 +1,131 @@
 # Bootcamp Treinos API
 
-API REST para o Bootcamp Treinos, construída com **Fastify**, **Prisma** e **Better Auth**. Oferece autenticação por e-mail/senha e estrutura de dados para planos de treino, dias da semana e exercícios.
+API REST para o Bootcamp Treinos (FSC), construída com **Fastify**, **Prisma** e **Better Auth**. Autenticação por e-mail/senha, planos de treino personalizados, acompanhamento de sessões de treino e um personal trainer virtual via IA.
 
 ---
 
-## Visão geral do que foi feito até o momento
+## Stack
 
-### 1. Stack e configuração base
-
-- **Runtime:** Node.js 24.x (ES Modules)
+- **Runtime:** Node.js 24.x (ES Modules), gerenciado com **pnpm**
 - **Framework HTTP:** Fastify 5
-- **Validação/serialização:** Zod + `fastify-type-provider-zod`
-- **Documentação da API:** OpenAPI/Swagger + **Scalar** (API Reference em `/docs`)
-- **CORS:** habilitado para `http://localhost:3000` com credenciais
-- **Banco de dados:** PostgreSQL via Prisma (adapter `@prisma/adapter-pg`)
+- **Validação/serialização:** Zod 4 + `fastify-type-provider-zod`
+- **Banco de dados:** PostgreSQL via Prisma 7 (adapter `@prisma/adapter-pg`)
+- **Autenticação:** Better Auth (e-mail/senha, sessão via cookie)
+- **IA:** Vercel AI SDK (v6) + OpenAI (`gpt-4o-mini`), com tool calling sobre os use cases do domínio
+- **Documentação da API:** OpenAPI/Swagger + Scalar (`/docs`)
 
-### 2. Autenticação (Better Auth)
+## Arquitetura
 
-- **Biblioteca:** Better Auth com plugin **openAPI**
-- **Método:** e-mail e senha (`emailAndPassword.enabled: true`)
-- **Persistência:** Prisma + adapter PostgreSQL
-- **Rotas:** todas as requisições para `/api/auth/*` (GET e POST) são repassadas ao handler do Better Auth (login, registro, sessão, etc.)
-- **Origem confiável:** `http://localhost:3000`
+Camadas: **Routes → Use Cases → Prisma**.
 
-Arquivo principal: `src/lib/auth.ts`.
+- `src/routes/` — handlers Fastify. Validam request/response com schemas Zod, extraem a sessão autenticada e traduzem erros de domínio em status HTTP.
+- `src/usecases/` — regras de negócio, uma classe por caso de uso.
+- `src/schemas/` — schemas Zod compartilhados entre validação de rota e documentação OpenAPI.
+- `src/errors/` — erros customizados (`NotFoundError`, `WorkoutPlanNotActiveError`, `SessionAlreadyStartedError`) lançados pelos use cases e mapeados nas rotas.
+- `src/lib/db.ts` — client Prisma singleton, compartilhado entre Better Auth e os use cases.
+- `src/lib/auth.ts` — configuração do Better Auth.
 
-### 3. Modelo de dados (Prisma)
+## Modelo de dados (Prisma)
 
-- **User:** id, name, email, emailVerified, image, createdAt, updatedAt; relações com WorkoutPlan, Session, Account.
-- **WorkoutPlan:** nome, userId, isActive; relação com WorkoutDay.
-- **WorkoutDay:** vinculado a um plano, weekDay (enum: MONDAY … SUNDAY), isRestDay; relação com WorkoutExercise.
-- **WorkoutExercise:** name, order, exerciseId, sets, reps, restTimeInSeconds; vinculado a WorkoutDay.
-- **Session / Account / Verification:** modelos usados pelo Better Auth (sessões, contas OAuth/senha, verificações).
+- **User** — dados de conta (Better Auth) + dados de treino opcionais (`weightInGrams`, `heightInCentimeters`, `age`, `bodyFatPercentage`), usados pela IA.
+- **WorkoutPlan** — pertence a um usuário; apenas um pode estar `isActive` por vez.
+- **WorkoutDay** — dia da semana (`weekDay`) de um plano; pode ser dia de descanso (`isRest`).
+- **WorkoutExercise** — exercício de um dia de treino (séries, repetições, descanso entre séries).
+- **WorkoutSession** — registro de início/conclusão de um dia de treino (`startedAt`/`completedAt`), usado para calcular streak e estatísticas.
+- **Session / Account / Verification** — modelos do Better Auth.
 
-*Observação:* ainda não há rotas da API (CRUD) para planos de treino, dias ou exercícios; apenas o schema e a autenticação estão implementados.
+## Rotas
 
-### 4. Rotas atuais
+| Método   | URL                                                          | Descrição                                          | Protegida |
+| -------- | ------------------------------------------------------------- | --------------------------------------------------- | :-------: |
+| GET/POST | `/api/auth/*`                                                  | Proxy para o Better Auth (login, sign-up, sessão…)   |     -     |
+| GET      | `/home/:date`                                                  | Dados da tela inicial (treino do dia, streak, semana)|     ✅     |
+| GET      | `/me`                                                          | Dados de treino do usuário (`null` se não cadastrado)|     ✅     |
+| PUT      | `/me`                                                          | Cria/atualiza dados de treino do usuário             |     ✅     |
+| GET      | `/stats?from=&to=`                                             | Estatísticas de treino num período                   |     ✅     |
+| GET      | `/workout-plans?active=`                                       | Lista os planos de treino do usuário                 |     ✅     |
+| POST     | `/workout-plans`                                                | Cria um plano de treino (desativa o anterior)        |     ✅     |
+| GET      | `/workout-plans/:workoutPlanId`                                 | Detalhe de um plano (dias + contagem de exercícios)  |     ✅     |
+| GET      | `/workout-plans/:workoutPlanId/days/:workoutDayId`              | Detalhe de um dia (exercícios + sessões)              |     ✅     |
+| POST     | `/workout-plans/:workoutPlanId/days/:workoutDayId/sessions`     | Inicia uma sessão de treino do dia                    |     ✅     |
+| PATCH    | `/workout-plans/:workoutPlanId/days/:workoutDayId/sessions/:sessionId` | Conclui uma sessão de treino                | ✅     |
+| POST     | `/ai`                                                           | Chat (streaming) com o personal trainer virtual       |     ✅     |
 
-| Método | URL            | Descrição |
-|--------|----------------|-----------|
-| GET    | `/`            | Retorna o objeto Swagger (especificação OpenAPI) da API. |
-| GET/POST | `/api/auth/*` | Proxy para o Better Auth (login, sign-up, sign-out, sessão, etc.). |
+Documentação interativa completa em `http://localhost:8081/docs` (Scalar), especificação OpenAPI em `/swagger.json`.
 
-### 5. Documentação interativa
+## Variáveis de ambiente
 
-- **Scalar API Reference:** em desenvolvimento em `http://localhost:3000/docs`
-- Dois “sources” configurados:
-  - **Treinos API:** especificação em `/swagger.json` (ou `/swagger.json` conforme config).
-  - **Better Auth:** schema OpenAPI gerado pelo plugin (URL configurada no Scalar).
+Copie `.env.example` para `.env` e preencha:
 
-### 6. Variáveis de ambiente
-
-- **PORT** (opcional): porta do servidor (padrão: `3000`).
-- **DATABASE_URL**: connection string PostgreSQL (ex.: `postgresql://user:password@localhost:5432/bootcamp-treinos`).
-
-O projeto usa `dotenv` (via `prisma.config.ts` e dependências) para carregar `.env`. Não versionar `.env`; usar `.env.example` com chaves sem valores sensíveis.
-
----
+| Variável              | Descrição                                                   |
+| --------------------- | ------------------------------------------------------------ |
+| `PORT`                | Porta do servidor (padrão: `8081`)                            |
+| `DATABASE_URL`        | Connection string do PostgreSQL                              |
+| `BETTER_AUTH_SECRET`  | Segredo usado pelo Better Auth para assinar sessões           |
+| `BETTER_AUTH_URL`     | URL pública da API (usada pelo Better Auth)                   |
+| `OPENAI_API_KEY`      | Chave da OpenAI, necessária para a rota `POST /ai`             |
 
 ## Como rodar o projeto
 
 ### Pré-requisitos
 
 - Node.js 24.x
-- PostgreSQL rodando e banco criado
-- Arquivo `.env` na raiz com `PORT` e `DATABASE_URL`
+- pnpm (`corepack enable` ou `npm i -g pnpm`)
+- Docker (para o PostgreSQL local)
 
-### Comandos
+### Passo a passo
 
 ```bash
 # Instalar dependências
-npm install
+pnpm install
 
-# Gerar cliente Prisma e rodar migrações (quando houver)
-npx prisma generate
-npx prisma migrate dev
+# Subir o PostgreSQL local
+docker compose up -d
+
+# Copiar variáveis de ambiente e preencher os valores
+cp .env.example .env
+
+# Rodar migrações e gerar o client Prisma
+pnpm exec prisma migrate dev
 
 # Desenvolvimento (watch)
-npm run dev
+pnpm dev
 ```
 
-O servidor sobe em `http://localhost:3000` (ou na porta definida em `PORT`).
+O servidor sobe em `http://localhost:8081` (ou na porta definida em `PORT`).
 
----
+### Outros comandos
 
-## Estrutura de pastas (principais)
+```bash
+pnpm lint      # ESLint
+pnpm format    # Prettier
+pnpm build     # Compila para ./dist
+```
+
+## Estrutura de pastas
 
 ```
 bootcamp-treinos-api/
 ├── prisma/
-│   ├── schema.prisma    # Modelos e enums
-│   └── migrations/      # Migrações do banco
+│   ├── schema.prisma
+│   └── migrations/
 ├── src/
-│   ├── index.ts         # Entrada Fastify, rotas, Swagger, CORS, proxy /api/auth/*
-│   └── lib/
-│       └── auth.ts      # Configuração Better Auth (Prisma, email/password, openAPI)
-├── prisma.config.ts     # Config Prisma (schema, migrations, DATABASE_URL)
-├── package.json
-└── .env                 # PORT, DATABASE_URL (não versionar)
+│   ├── index.ts          # Entrada Fastify: Swagger, CORS, docs, registro de rotas
+│   ├── errors/            # Erros de domínio
+│   ├── schemas/           # Schemas Zod compartilhados
+│   ├── routes/            # Handlers Fastify (home, me, stats, workout-plan, ai)
+│   ├── usecases/          # Regras de negócio
+│   ├── lib/
+│   │   ├── auth.ts        # Configuração Better Auth
+│   │   └── db.ts          # Client Prisma singleton
+│   └── generated/prisma/  # Client Prisma gerado (gitignored)
+├── prisma.config.ts
+├── docker-compose.yml      # PostgreSQL local
+└── package.json
 ```
 
----
+## Roadmap / próximos passos
 
-## Próximos passos sugeridos (roadmap)
-
-1. **Rotas de domínio:** CRUD para `WorkoutPlan`, `WorkoutDay` e `WorkoutExercise` (protegidas por sessão Better Auth).
-2. **Ajustes na raiz:** alinhar rota `GET /` ao schema (ex.: retornar `{ message: "Bootcamp Treinos API" }` ou manter só o Swagger em outro path).
-3. **Documentação:** corrigir URL do Better Auth no Scalar se estiver incorreta (ex.: `/aoi/` → `/api/`) e garantir que `/swagger.json` esteja acessível.
-4. **Testes:** substituir o script de test placeholder por testes (ex.: Vitest/Jest) para rotas e auth.
-5. **Segurança:** revisar CORS e `trustedOrigins` para produção; não expor dados sensíveis no OpenAPI.
-
----
-
-## Resumo técnico
-
-- **Feito:** API Fastify com Zod, OpenAPI + Scalar, CORS, proxy completo do Better Auth em `/api/auth/*`, modelo Prisma para usuários, planos de treino, dias e exercícios, e documentação parcial.
-- **Pendente:** rotas de negócio para treinos, testes automatizados e ajustes finos de documentação e produção.
-
-Se quiser, posso detalhar algum trecho (por exemplo, apenas auth ou apenas Prisma) ou propor mudanças concretas nos arquivos.
+- Testes automatizados (Vitest) para use cases e rotas
+- Rate limiting e observabilidade (logs estruturados já existem via Fastify logger)
+- Deploy (Docker image + CI)
