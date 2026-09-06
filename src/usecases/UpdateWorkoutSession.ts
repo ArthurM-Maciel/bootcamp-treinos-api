@@ -1,4 +1,4 @@
-import { NotFoundError } from "../errors/index.js";
+import { InvalidCompletionDateError, NotFoundError } from "../errors/index.js";
 import { prisma } from "../lib/db.js";
 
 interface InputDto {
@@ -41,9 +41,16 @@ export class UpdateWorkoutSession {
       throw new NotFoundError("Workout session not found");
     }
 
+    const completedAt = new Date(dto.completedAt);
+    if (completedAt < session.startedAt) {
+      throw new InvalidCompletionDateError(
+        "completedAt cannot be before startedAt",
+      );
+    }
+
     const updatedSession = await prisma.workoutSession.update({
       where: { id: dto.sessionId },
-      data: { completedAt: new Date(dto.completedAt) },
+      data: { completedAt },
     });
 
     return {

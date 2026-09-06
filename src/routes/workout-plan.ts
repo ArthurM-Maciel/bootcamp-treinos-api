@@ -4,6 +4,7 @@ import { ZodTypeProvider } from "fastify-type-provider-zod";
 import z from "zod";
 
 import {
+  InvalidCompletionDateError,
   NotFoundError,
   SessionAlreadyStartedError,
   WorkoutPlanNotActiveError,
@@ -313,6 +314,7 @@ export const workoutPlanRoutes = async (app: FastifyInstance) => {
       body: UpdateWorkoutSessionBodySchema,
       response: {
         200: UpdateWorkoutSessionSchema,
+        400: ErrorSchema,
         401: ErrorSchema,
         404: ErrorSchema,
         500: ErrorSchema,
@@ -347,6 +349,13 @@ export const workoutPlanRoutes = async (app: FastifyInstance) => {
           return reply.status(404).send({
             error: error.message,
             code: "NOT_FOUND_ERROR",
+          });
+        }
+
+        if (error instanceof InvalidCompletionDateError) {
+          return reply.status(400).send({
+            error: error.message,
+            code: "INVALID_COMPLETION_DATE_ERROR",
           });
         }
 
