@@ -151,6 +151,7 @@ export class GetStats {
       }
 
       if (restWeekDays.has(weekDay)) {
+        streak++;
         day = day.subtract(1, "day");
         continue;
       }
