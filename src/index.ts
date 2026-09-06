@@ -36,7 +36,7 @@ await app.register(fastifySwagger, {
     servers: [
       {
         description: "Localhost",
-        url: "http://localhost:8080",
+        url: "http://localhost:8081",
       },
     ],
   },
@@ -114,7 +114,8 @@ app.route({
       // Convert Fastify headers to standard Headers object
       const headers = new Headers();
       Object.entries(request.headers).forEach(([key, value]) => {
-        if (value) headers.append(key, value.toString());
+        if (value)
+          headers.append(key, Array.isArray(value) ? value.join(", ") : value);
       });
       // Create Fetch API-compatible request
       const req = new Request(url.toString(), {
